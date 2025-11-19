@@ -27,6 +27,12 @@ if __name__ == "__main__":
         # default="/home/yanjieze/projects/g1_wbc/GMR/motion_data/ACCAD/Male2MartialArtsPunches_c3d/E1_-__Jab_left_stageii.npz",
         # default="/home/yanjieze/projects/g1_wbc/GMR/motion_data/ACCAD/Male1Running_c3d/Run_C24_-_quick_side_step_left_stageii.npz",
     )
+
+    parser.add_argument(
+        '--headless',
+        action='store_true',
+        help='Run without Mujoco viewer / GLFW (for clusters / no DISPLAY)'
+    )
     
     parser.add_argument(
         "--robot",
@@ -66,6 +72,10 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    # In headless mode, disable video recording (it needs a viewer / display)
+    if args.headless:
+        args.record_video = False
+
 
     SMPLX_FOLDER = HERE / ".." / "assets" / "body_models"
     
@@ -87,11 +97,15 @@ if __name__ == "__main__":
         tgt_robot=args.robot,
     )
     
-    robot_motion_viewer = RobotMotionViewer(robot_type=args.robot,
-                                            motion_fps=aligned_fps,
-                                            transparent_robot=0,
-                                            record_video=args.record_video,
-                                            video_path=f"videos/{args.robot}_{args.smplx_file.split('/')[-1].split('.')[0]}.mp4",)
+    robot_motion_viewer = None
+    if not args.headless:
+        robot_motion_viewer = RobotMotionViewer(
+            robot_type=args.robot,
+            motion_fps=aligned_fps,
+            transparent_robot=0,
+            record_video=args.record_video,
+            video_path=f"videos/{args.robot}_{args.smplx_file.split('/')[-1].split('.')[0]}.mp4",
+        )
     
 
     curr_frame = 0
@@ -132,17 +146,18 @@ if __name__ == "__main__":
         # retarget
         qpos = retarget.retarget(smplx_data)
 
-        # visualize
-        robot_motion_viewer.step(
-            root_pos=qpos[:3],
-            root_rot=qpos[3:7],
-            dof_pos=qpos[7:],
-            human_motion_data=retarget.scaled_human_data,
-            # human_motion_data=smplx_data,
-            human_pos_offset=np.array([0.0, 0.0, 0.0]),
-            show_human_body_name=False,
-            rate_limit=args.rate_limit,
-        )
+        # visualize (if not headless)
+        if robot_motion_viewer is not None:
+            robot_motion_viewer.step(
+                root_pos=qpos[:3],
+                root_rot=qpos[3:7],
+                dof_pos=qpos[7:],
+                human_motion_data=retarget.scaled_human_data,
+                # human_motion_data=smplx_data,
+                human_pos_offset=np.array([0.0, 0.0, 0.0]),
+                show_human_body_name=False,
+                rate_limit=args.rate_limit,
+            )
         if args.save_path is not None:
             qpos_list.append(qpos)
             
@@ -168,5 +183,5 @@ if __name__ == "__main__":
         print(f"Saved to {args.save_path}")
             
       
-    
-    robot_motion_viewer.close()
+    if robot_motion_viewer is not None:
+        robot_motion_viewer.close()
