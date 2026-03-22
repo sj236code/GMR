@@ -24,6 +24,8 @@ setup(
     "natsort",
     "psutil",
     "smplx @ git+https://github.com/vchoutas/smplx",
+    # chumpy: install separately (PyPI 0.70 is broken; git needs --no-build-isolation):
+    #   pip install "git+https://github.com/mattloper/chumpy.git" --no-build-isolation
     "protobuf",
     "redis[hiredis]",
     "imageio[ffmpeg]",
