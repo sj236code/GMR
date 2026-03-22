@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import smplx
 import torch
@@ -7,17 +9,73 @@ from scipy.interpolate import interp1d
 
 import general_motion_retargeting.utils.lafan_vendor.utils as utils
 
+
+def _normalize_smplx_gender(gender):
+    """AMASS often stores gender as bytes or a 0-d ndarray."""
+    g = gender
+    if isinstance(g, np.ndarray):
+        g = g.item()
+    if isinstance(g, (bytes, bytearray)):
+        return g.decode("utf-8").strip().lower()
+    return str(g).strip().lower()
+
+
+def _assert_full_smplx_pkl(pkl_path: str) -> None:
+    """Mesh-only SMPL-X exports (same content as the small .npz) are often ~300MB pickles without hand PCA."""
+    with open(pkl_path, "rb") as f:
+        blob = f.read()
+    if b"hands_componentsl" not in blob:
+        raise RuntimeError(
+            f"{pkl_path} is a mesh-only SMPL-X pickle (no hands_componentsl). "
+            "vchoutas/smplx needs the full SMPL-X model with hand PCA. "
+            "On https://smpl-x.is.tue.mpg.de/download.php download "
+            "**SMPL-X v1.1 (NPZ+PKL, 830 MB)** — the option labeled "
+            "**'Use this for SMPL-X Python codebase'** — and replace your "
+            "SMPLX_NEUTRAL/MALE/FEMALE.pkl files. "
+            "Quick test: run "
+            "`python -c \"print(b'hands_componentsl' in open('SMPLX_MALE.pkl','rb').read())\"` "
+            "(must print True)."
+        )
+
+
+def _smplx_body_model_ext(smplx_body_model_path: str, gender: str) -> str:
+    """Official SMPL-X .npz in the MPI zip are mesh-only; vchoutas/smplx needs full .pkl (hands PCA, etc.)."""
+    smplx_dir = os.path.join(smplx_body_model_path, "smplx")
+    if not os.path.isdir(smplx_dir):
+        smplx_dir = smplx_body_model_path
+    g = gender.upper()
+    pkl_path = os.path.join(smplx_dir, f"SMPLX_{g}.pkl")
+    npz_path = os.path.join(smplx_dir, f"SMPLX_{g}.npz")
+    if os.path.isfile(pkl_path) and os.path.getsize(pkl_path) > 100_000:
+        _assert_full_smplx_pkl(pkl_path)
+        return "pkl"
+    if os.path.isfile(npz_path):
+        with np.load(npz_path, allow_pickle=True) as z:
+            if "hands_componentsl" not in z.files:
+                raise RuntimeError(
+                    f"SMPL-X mesh-only .npz at {npz_path} cannot be used with smplx (missing "
+                    f"hands_componentsl). Add the full SMPLX_{g}.pkl from the same SMPL-X "
+                    f"NPZ+PKL download (expected next to it: {pkl_path}). "
+                    f"If the .pkl exists but is tiny, it may be a Git LFS pointer — fetch LFS or re-copy the real file."
+                )
+        return "npz"
+    return "npz"
+
+
 def load_smpl_file(smpl_file):
     smpl_data = np.load(smpl_file, allow_pickle=True)
     return smpl_data
 
 def load_smplx_file(smplx_file, smplx_body_model_path):
     smplx_data = np.load(smplx_file, allow_pickle=True)
+    gender_s = _normalize_smplx_gender(smplx_data["gender"])
+    ext = _smplx_body_model_ext(smplx_body_model_path, gender_s)
     body_model = smplx.create(
         smplx_body_model_path,
         "smplx",
-        gender=str(smplx_data["gender"]),
+        gender=gender_s,
         use_pca=False,
+        ext=ext,
     )
     # print(smplx_data["pose_body"].shape)
     # print(smplx_data["betas"].shape)
@@ -72,11 +130,13 @@ def load_gvhmr_pred_file(gvhmr_pred_file, smplx_body_model_path):
         "mocap_frame_rate": torch.tensor(30),
     }
 
+    ext = _smplx_body_model_ext(smplx_body_model_path, "neutral")
     body_model = smplx.create(
         smplx_body_model_path,
         "smplx",
         gender="neutral",
         use_pca=False,
+        ext=ext,
     )
     
     num_frames = smpl_params_global['body_pose'].shape[0]
