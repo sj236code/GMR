@@ -3,6 +3,10 @@ from setuptools import setup, find_packages
 setup(
   name = 'general_motion_retargeting',
   packages = find_packages(),
+  package_data={
+      "general_motion_retargeting": ["opensim/mappings/*.json"],
+  },
+  include_package_data=True,
   author="Yanjie Ze",
   author_email="lastyanjieze@gmail.com",
   description="General Motion Retargeting (GMR) for Humanoid Robots",

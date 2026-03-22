@@ -1,0 +1,48 @@
+{
+  "_description": "Unitree G1 → Gait 2392 for walking / turns / transitions (both legs + forward/back pelvis).",
+  "_vs_sidestep": "No leg_asymmetry. body_frame_lateral puts progression on pelvis_tx (sagittal) and side drift on pelvis_tz — avoids world X/Y vs OpenSim forward mismatch from world_plane.",
+  "_source_motion_note": "A filename like *walk_back* usually means the mocap is backward walking — pelvis_tx should decrease along progression; that is faithful to the clip, not an exporter bug. Use sagittal_scale:-1 only if you want to flip progression (e.g. forward mocap looks reversed in OpenSim).",
+  "_pelvis_note": "Default sagittal_scale:1 preserves sign of body-frame displacement vs OpenSim pelvis_tx. If root XY is flat, use pelvis_horizontal.mode world_plane in a custom JSON.",
+  "_hip_note": "hip_flexion_* is G1 hip pitch only; OpenSim hips are 3-DOF (adduction/rotation get roll/yaw). If swing clearance looks flat, inspect hip_flexion columns in the .mot and tune signs/offsets per coordinate.",
+  "subtract_initial_root_axes": [],
+  "_motor_order": [
+    "0-5 left leg: hip_pitch, hip_roll, hip_yaw, knee, ankle_pitch, ankle_roll",
+    "6-11 right leg: same",
+    "12-14 waist: yaw, roll, pitch",
+    "15-28 arms (not used in this .mot layout)"
+  ],
+  "pelvis_orientation": null,
+  "pelvis_horizontal": {
+    "mode": "body_frame_lateral",
+    "horizontal_plane_axis0": 0,
+    "horizontal_plane_axis1": 1,
+    "forward_body_matrix_column": 0,
+    "lateral_to": "pelvis_tz",
+    "sagittal_to": "pelvis_tx",
+    "lateral_scale": -1.0,
+    "sagittal_scale": 1.0,
+    "lateral_offset_m": 0.0,
+    "sagittal_offset_m": 0.0
+  },
+  "pelvis_ty": {
+    "axis": 2,
+    "scale": 1.0,
+    "offset_m": 0.0,
+    "use_absolute_root_pos": true
+  },
+  "dof_rad_to_deg": {
+    "hip_flexion_r": { "index": 6, "sign": 1.0, "offset_deg": 0.0 },
+    "hip_adduction_r": { "index": 7, "sign": 1.0, "offset_deg": 0.0 },
+    "hip_rotation_r": { "index": 8, "sign": 1.0, "offset_deg": 0.0 },
+    "knee_angle_r": { "index": 9, "sign": -1.0, "offset_deg": 0.0 },
+    "ankle_angle_r": { "index": 10, "sign": 1.0, "offset_deg": 0.0 },
+    "hip_flexion_l": { "index": 0, "sign": -1.0, "offset_deg": 0.0 },
+    "hip_adduction_l": { "index": 1, "sign": -1.0, "offset_deg": 0.0 },
+    "hip_rotation_l": { "index": 2, "sign": -1.0, "offset_deg": 0.0 },
+    "knee_angle_l": { "index": 3, "sign": -1.0, "offset_deg": 0.0 },
+    "ankle_angle_l": { "index": 4, "sign": -1.0, "offset_deg": 0.0 },
+    "lumbar_bending": { "index": 13, "sign": 1.0, "offset_deg": 0.0 },
+    "lumbar_rotation": { "index": 12, "sign": 1.0, "offset_deg": 0.0 },
+    "lumbar_extension": { "index": 14, "sign": 1.0, "offset_deg": 0.0 }
+  }
+}

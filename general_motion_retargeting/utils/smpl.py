@@ -66,8 +66,63 @@ def load_smpl_file(smpl_file):
     smpl_data = np.load(smpl_file, allow_pickle=True)
     return smpl_data
 
+
+def _amass_npz_to_smplx_motion_dict(npz) -> dict:
+    """
+    Normalize AMASS .npz (stage I or II) to the keys used by load_smplx_file /
+    get_smplx_data_offline_fast.
+
+    Stage II provides root_orient, pose_body, trans, betas, gender.
+    Stage I uses a single poses (N, D) array: first 3 = global orient, next 63 = SMPL-X body.
+    """
+    d: dict = {k: np.asarray(npz[k]) for k in npz.files}
+
+    if "mocap_framerate" in d and "mocap_frame_rate" not in d:
+        d["mocap_frame_rate"] = d.pop("mocap_framerate")
+    if "mocap_frame_rate" not in d:
+        d["mocap_frame_rate"] = np.array(120.0, dtype=np.float64)
+
+    if "pose_body" not in d:
+        if "poses" not in d:
+            raise KeyError(
+                "Expected AMASS fields 'pose_body' + 'root_orient' (*_stageii.npz) or "
+                "'poses' (*_stagei.npz). "
+                f"Keys in file: {sorted(d.keys())}"
+            )
+        poses = np.asarray(d["poses"], dtype=np.float64)
+        if poses.ndim != 2:
+            raise ValueError(f"'poses' must be 2D, got shape {poses.shape}")
+        if poses.shape[1] < 66:
+            raise ValueError(
+                f"'poses' needs width >= 66 (root + SMPL-X body 21×3); got {poses.shape[1]}"
+            )
+        d["root_orient"] = poses[:, :3].copy()
+        d["pose_body"] = poses[:, 3:66].copy()
+
+    if "trans" not in d:
+        raise KeyError(f"Missing 'trans'. Keys present: {sorted(d.keys())}")
+
+    if "betas" not in d:
+        d["betas"] = np.zeros(16, dtype=np.float64)
+    else:
+        b = np.asarray(d["betas"], dtype=np.float64).reshape(-1)
+        if b.size == 10:
+            b = np.concatenate([b, np.zeros(6, dtype=np.float64)])
+        elif b.size > 16:
+            b = b[:16]
+        elif b.size < 16:
+            b = np.pad(b, (0, 16 - b.size))
+        d["betas"] = b
+
+    if "gender" not in d:
+        raise KeyError(f"Missing 'gender'. Keys present: {sorted(d.keys())}")
+
+    return d
+
+
 def load_smplx_file(smplx_file, smplx_body_model_path):
-    smplx_data = np.load(smplx_file, allow_pickle=True)
+    with np.load(smplx_file, allow_pickle=True) as raw:
+        smplx_data = _amass_npz_to_smplx_motion_dict(raw)
     gender_s = _normalize_smplx_gender(smplx_data["gender"])
     ext = _smplx_body_model_ext(smplx_body_model_path, gender_s)
     body_model = smplx.create(
